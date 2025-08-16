@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>EV Smart Navigator — Google Maps Redirect</title>
+<style>
+:root{
+  --bg:#000;
+  --panel:#0b120cba;
+  --glass:#0b120c6b;
+  --neon:#19ff6d;
+  --neon-soft:#19ff6d55;
+  --txt:#eaffea;
+  --muted:#b6ffcf99;
+  --warn:#ffd85a;
+  --danger:#ff5a5a;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(900px 600px at 10% -10%, #06150b 0%, #000 55%), var(--bg);color:var(--txt);font:500 15px/1.35 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;overflow:hidden}
+#fx{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.55}
+header{
+  position:fixed;left:8px;right:8px;top:8px;z-index:4;
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  background:linear-gradient(180deg, var(--panel), #0b120c88);
+  border:1px solid #19ff6d22;border-radius:14px;padding:8px 10px;backdrop-filter:blur(8px)
+}
+.logo{display:flex;align-items:center;gap:.6rem;font-weight:800}
+.logo .dot{width:22px;height:22px;border-radius:7px;background:radial-gradient(8px 8px at 35% 35%, var(--neon), #0f0 50%, transparent 70%), #041;
+  border:1px solid #19ff6d88;box-shadow:0 0 18px #19ff6d77 inset,0 0 16px #19ff6d66}
+.search{flex:1;min-width:220px;position:relative;display:flex;gap:8px}
+.search input{width:100%;padding:.7rem .9rem;border:1px solid #19ff6d33;border-radius:12px;background:#040a05;color:var(--txt);box-shadow:inset 0 0 20px #19ff6d0f}
+.autolist{position:absolute;top:110%;left:0;right:0;max-height:240px;overflow:auto;display:none;background:#041006f2;border:1px solid #19ff6d33;border-radius:12px}
+.autolist.show{display:block}
+.autolist div{padding:.55rem .7rem;border-bottom:1px solid #19ff6d10;cursor:pointer}
+.autolist div:hover{background:#092014}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:.35rem;border:1px solid #19ff6d33;border-radius:999px;padding:.32rem .6rem;cursor:pointer}
+.btn{display:inline-flex;align-items:center;gap:.5rem;border:1px solid #19ff6d33;border-radius:12px;background:#071108;color:var(--txt);padding:.55rem .8rem;cursor:pointer}
+.btn:hover{border-color:var(--neon);box-shadow:0 0 14px #19ff6d33}
+.ghost{background:transparent}
+.badge{border:1px solid #19ff6d55;padding:.15rem .5rem;border-radius:8px;font-size:.75rem}
+#mapWrap{position:absolute;inset:64px 8px 8px 8px;display:grid;grid-template-columns:minmax(260px,340px) 1fr minmax(260px,360px);gap:8px}
+#left,#right{background:var(--glass);border:1px solid #19ff6d20;border-radius:14px;backdrop-filter:blur(10px);overflow:auto;min-height:0;padding:8px}
+#map{position:relative;border-radius:14px;border:1px solid #19ff6d22;overflow:hidden}
+#mapCanvas{position:absolute;inset:0;z-index:0!important; background-color: #333; }
+#hud{position:absolute;left:10px;bottom:10px;z-index:2;background:#041006e6;border:1px solid #19ff6d33;border-radius:8px;padding:.45rem .6rem}
+#eta{position:absolute;right:10px;bottom:10px;z-index:2;background:#041006e6;border:1px solid #19ff6d33;border-radius:8px;padding:.45rem .6rem}
+.modal{position:fixed!important;z-index:9999!important}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.card{background:#05120a9c;border:1px solid #19ff6d22;border-radius:12px;padding:.7rem;margin-bottom:8px}
+.station{display:grid;grid-template-columns:1fr auto;gap:6px}
+.pill{font-size:.75rem;border:1px solid #19ff6d33;border-radius:999px;padding:.12rem .4rem;margin-right:4px;white-space:nowrap}
+.spark{width:120px;height:34px}
+#sheet{display:none}
+#chat{position:fixed;right:10px;top:72px;width:320px;max-width:92vw;background:#041006f2;border:1px solid #19ff6d55;border-radius:12px;padding:8px;display:none;z-index:6}
+#msgs{max-height:38vh;overflow:auto}
+.msg{background:#062015;border:1px solid #19ff6d22;padding:.45rem .6rem;border-radius:10px;margin:.25rem 0}
+.me{background:#0a2a1b;border-color:#19ff6d66}
+.modal{position:fixed;inset:0;display:none;place-items:center;background:#0008;z-index:8}
+.box{width:min(720px,92vw);max-height:85vh;overflow:auto;background:#041006f2;border:1px solid #19ff6d44;border-radius:16px;padding:12px}
+.close{float:right;cursor:pointer;font-weight:900}
+#toasts{position:fixed;left:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;z-index:9}
+.toast{background:#041006f2;border:1px solid #19ff6d44;border-radius:10px;padding:.55rem .75rem;animation:slide .18s ease}
+@keyframes slide{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+:focus-visible{outline:2px solid var(--neon);outline-offset:2px;border-radius:8px}
+#voice-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: none;
+    place-items: center;
+    background: rgba(11, 18, 12, 0.7);
+    backdrop-filter: blur(8px);
+    text-align: center;
+}
+#voice-icon {
+    width: 100px;
+    height: 100px;
+    font-size: 48px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 2px solid var(--neon);
+    box-shadow: 0 0 25px var(--neon);
+    animation: pulse 1.5s infinite ease-in-out;
+}
+#voice-transcript {
+    margin-top: 20px;
+    font-size: 1.2rem;
+    color: var(--txt);
+    min-height: 2rem;
+}
+@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(25, 255, 109, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(25, 255, 109, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(25, 255, 109, 0); }
+}
+@media (max-width:980px){#mapWrap{grid-template-columns:1fr;grid-template-rows:1fr;gap:8px}#left,#right{display:none}#sheet{display:block;position:fixed;left:8px;right:8px;bottom:8px;z-index:5}#mapWrap{inset:64px 8px 88px 8px}#fabBar{position:fixed;left:8px;right:8px;bottom:8px;display:flex;gap:8px;justify-content:space-between;z-index:6}}
+</style>
+</head>
+<body>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<header role="banner">
+  <div class="logo" aria-label="App logo">
+    <div class="dot" aria-hidden="true"></div>
+    <div>EV Smart Navigator <small class="badge" style="margin-left:.4rem">Advanced</small></div>
+  </div>
+  <div class="search" role="search" aria-label="Global search">
+    <input id="q" placeholder="Search any location in India…" autocomplete="off" aria-autocomplete="list" aria-controls="alist"/>
+    <div id="alist" class="autolist" role="listbox"></div>
+    <button id="qbtn" class="btn">🔎</button>
+  </div>
+  <div class="chips" aria-label="City shortcuts">
+    <div class="chip" data-city="Kochi">Kochi</div>
+    <div class="chip" data-city="Thiruvananthapuram">Thiruvananthapuram</div>
+    <div class="chip" data-city="Mumbai">Mumbai</div>
+    <div class="chip" data-city="Delhi">Delhi</div>
+    <div class="chip" data-city="Bengaluru">Bengaluru</div>
+  </div>
+  <div class="chips" role="group" aria-label="Actions">
+    <button id="mic" class="btn">🎙️ Voice</button>
+    <button id="loc" class="btn">📍 Locate</button>
+    <button id="buddy" class="btn">👥 Buddy</button>
+    <button id="lead" class="btn">🏆 Leaderboard</button>
+    <button id="wallet" class="btn">💰 Wallet</button>
+    <button id="settings" class="btn">⚙️ Settings</button>
+  </div>
+</header>
+
+<div id="mapWrap" role="application" aria-label="EV Navigator map">
+  <aside id="left" aria-label="Stations & Filters">
+    <div class="filters">
+      <div class="chip" data-sort="distance">📏 Distance</div>
+      <div class="chip" data-sort="price">₹ Price</div>
+      <div class="chip" data-sort="speed">⚡ Speed</div>
+      <div class="chip" data-sort="availability">🟢 Availability</div>
+      <div class="chip" data-sort="eco">🌿 Eco</div>
+      <div class="chip" id="rs">Reset</div>
+    </div>
+    <div id="list">
+      <div class="card">Click 'Locate' to find nearby stations…</div>
+    </div>
+  </aside>
+  <section id="map" aria-label="Map">
+    <div id="mapCanvas"></div>
+    <div id="hud" class="badge">Map: loading…</div>
+    <div id="eta" class="badge">ETA — • 0.0 km</div>
+  </section>
+  <aside id="right" aria-label="Details & Actions">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div><div style="font-weight:800">Battery</div><small style="color:var(--muted)">Emergency Boost at < 10%</small></div>
+        <input id="bat" type="range" min="1" max="100" value="56" aria-label="Battery %"><span id="batv" class="badge">56%</span>
+      </div>
+    </div>
+    <div class="card" id="detail">
+      <div style="display:flex;justify-content:space-between;gap:6px; flex-wrap:wrap;">
+        <div><div id="dName" style="font-weight:800">Select a station</div><small id="dCity" style="color:var(--muted)">—</small></div>
+        <div style="display:flex; gap: 6px;">
+            <div id="dTraffic" class="badge">Traffic: —</div>
+            <div id="dRating" class="badge">★ —</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <div><div class="badge">Wait (1h)</div><canvas id="sp1" class="spark"></canvas></div>
+        <div><div class="badge">Wait (6h)</div><canvas id="sp6" class="spark"></canvas></div>
+      </div>
+      <div class="card" style="margin-top:8px">
+        <div class="badge">Energy Mix</div><canvas id="donut" style="width:100%;height:140px"></canvas>
+        <div style="margin-top:6px">Eco Score: <b id="eco">—</b></div>
+      </div>
+      <div class="card" style="margin-top:8px">
+        <div style="font-weight:700;margin-bottom:4px">Speed & Cost Comparison</div><div id="comp"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button id="nav" class="btn">▶️ Navigate</button>
+        <button id="gmap-nav" class="btn ghost">🌍 G Maps</button> <button id="reserve" class="btn">🗓️ Reserve</button>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700">Reservation Marketplace</div><button id="sell" class="btn">💸 Sell</button>
+      </div><div id="market" style="margin-top:6px"></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700">Buddy Charge</div><label class="chip"><input id="visible" type="checkbox" checked> Visible</label>
+      </div><div id="buddies" style="margin-top:6px"></div>
+    </div>
+  </aside>
+</div>
+<div id="sheet" class="card" aria-live="polite">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+    <div><b id="sName">—</b> <span class="badge" id="sCity">—</span></div>
+    <div style="display:flex; gap: 6px;">
+        <span class="badge" id="sTraffic">Traffic: —</span>
+        <span class="badge" id="sRating">★ —</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:6px"><canvas id="sSp1" class="spark"></canvas><canvas id="sSp6" class="spark"></canvas></div>
+  <div id="sComp" style="margin-top:6px"></div>
+  <div style="display:flex;gap:8px;margin-top:6px">
+    <button id="sNav" class="btn">▶️ Navigate</button>
+    <button id="s-gmap-nav" class="btn ghost">🌍</button> <button id="sReserve" class="btn">🗓️ Reserve</button>
+  </div>
+</div>
+<div id="fabBar" style="display:none"><button class="btn" id="fabVoice">🎙️</button><button class="btn" id="fabLocate">📍</button><button class="btn" id="fabBuddy">👥</button><button class="btn" id="fabWallet">💰</button></div>
+<div id="chat" role="dialog" aria-label="Buddy Chat">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div>Buddy Chat</div><div class="close" data-close="#chat">✖</div></div>
+  <div id="msgs"></div>
+  <div style="display:flex;gap:6px;margin-top:6px"><input id="say" placeholder="Message…" aria-label="Chat message"/><button id="send" class="btn">Send</button></div>
+</div>
+<div id="walletModal" class="modal" role="dialog" aria-label="Wallet">
+  <div class="box">
+    <div class="close" data-close="#walletModal">✖</div><h3>Wallet</h3>
+    <div class="card">Balance: <span id="bal" class="badge"></span></div>
+    <div style="display:flex;gap:6px" class="card"><input id="amt" type="number" min="1" placeholder="₹ amount"/><button id="add" class="btn">Add</button><button id="ded" class="btn">Deduct</button></div>
+    <div class="card"><div style="font-weight:700">History</div><div id="hist" style="max-height:220px;overflow:auto;margin-top:6px"></div></div>
+  </div>
+</div>
+<div id="leader" class="modal" role="dialog" aria-label="Leaderboard">
+  <div class="box">
+    <div class="close" data-close="#leader">✖</div><h3>Eco Points Leaderboard</h3>
+    <div class="chips"><div class="chip" data-tab="weekly">Weekly</div><div class="chip" data-tab="all">All-time</div></div>
+    <div id="lb" style="margin-top:6px"></div>
+  </div>
+</div>
+<div id="reserveModal" class="modal" role="dialog" aria-label="Reserve slot">
+  <div class="box">
+    <div class="close" data-close="#reserveModal">✖</div><h3>Reserve a Slot</h3><div class="badge" id="resFor">—</div>
+    <div class="chips" style="margin-top:6px">
+      <label class="chip">Start <input id="rStart" type="time"></label><label class="chip">Duration <input id="rDur" type="number" min="15" step="15" value="45"></label><label class="chip">Connector <select id="rConn"></select></label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:6px;align-items:center"><button id="rGo" class="btn">Reserve</button><button id="rCancel" class="btn">Cancel Mine</button><span id="rNote" class="badge">—</span></div>
+  </div>
+</div>
+<div id="sellModal" class="modal" role="dialog" aria-label="Sell slot">
+  <div class="box">
+    <div class="close" data-close="#sellModal">✖</div><h3>List Reservation for Sale</h3><small style="color:var(--muted)">Rule: cannot sell within 15 minutes of start.</small>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <label class="chip">Price ₹ <input id="sellPrice" type="number" min="1" value="150"></label><label class="chip" style="flex:2">Notes <input id="sellNotes" placeholder="Optional notes"></label>
+    </div><button id="sellGo" class="btn" style="margin-top:6px">List</button>
+  </div>
+</div>
+<div id="settingsModal" class="modal" role="dialog" aria-label="Settings">
+  <div class="box">
+    <div class="close" data-close="#settingsModal">✖</div><h3>Settings</h3>
+    <div class="chips" style="margin-top:6px">
+      <label class="chip"><input id="reduce" type="checkbox"> Reduce Motion</label>
+      <label class="chip"><input id="invis" type="checkbox"> Buddy Invisible Mode</label>
+      <label class="chip"><input id="block" type="checkbox"> Block Strangers</label>
+    </div>
+    <button id="saveSettings" class="btn" style="margin-top: 8px;">Save Settings</button>
+  </div>
+</div>
+<div id="toasts" aria-live="polite"></div>
+
+<div id="voice-overlay" aria-live="assertive" role="dialog" aria-modal="true">
+    <div>
+        <div id="voice-icon">🎙️</div>
+        <p id="voice-transcript">Listening...</p>
+    </div>
+</div>
+
+<script>
+/* =========================================================
+   Variant B — Advanced Edition
+   Sections:
+   00. TomTom Integration
+   01. Data & Persistence
+   ...and so on...
+========================================================= */
+
+// =========================================================
+// =============== 00. TomTom Integration ===============
+// =========================================================
+
+const TOMTOM_API_KEY = 'hWFOCkzzM2lEHiVdV7mIuZRdCZRs3QvO';
+
+// ========== MODIFICATION START: Universal Geocoding Function ==========
+/**
+ * Geocodes a query string to coordinates and centers the map.
+ * This function ONLY navigates the map. It does not search for stations.
+ * @param {string} query The location to search for (e.g., "Pune", "India Gate, Delhi").
+ */
+async function geocodeAndNavigate(query) {
+    if (!query) return;
+    toast(`Searching for "${query}"...`);
+    const url = `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(query)}.json?key=${TOMTOM_API_KEY}&countrySet=IN&limit=1`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        const data = await response.json();
+        if (data.results && data.results.length > 0) {
+            const { position } = data.results[0];
+            Map.center([position.lon, position.lat], 13);
+            toast(`Location found: ${data.results[0].address.freeformAddress}`, 'ok');
+        } else {
+            toast(`Could not find location: "${query}"`, 'err');
+        }
+    } catch (error) {
+        console.error("TomTom Geocode Error:", error);
+        toast('Failed to search for location.', 'err');
+    }
+}
+// ========== MODIFICATION END ==========
+
+
+function transformTomTomStation(ttStation) {
+    const { poi, address, position, chargingPark } = ttStation;
+    const connectors = (chargingPark?.connectors || []).reduce((acc, conn) => {
+        const type = conn.connectorType.replace(/_/g, ' ');
+        const kw = conn.ratedPowerKW;
+        const key = `${type}-${kw}kW`;
+        if (!acc[key]) {
+            acc[key] = { type: type, kw: kw, count: 0 };
+        }
+        acc[key].count++;
+        return acc;
+    }, {});
+    const totalConnectors = Object.values(connectors).reduce((sum, c) => sum + c.count, 0);
+    const freeCount = Math.floor(Math.random() * (totalConnectors + 1));
+    return {
+        id: ttStation.id, name: poi.name, city: address.municipality || 'Unknown City',
+        rating: (4.0 + Math.random()).toFixed(1), coords: [position.lon, position.lat],
+        connectors: Object.values(connectors), price: 15 + Math.floor(Math.random() * 10),
+        amenities: ['24x7'], renewable: 40 + Math.floor(Math.random() * 50),
+        grid: 100 - (40 + Math.floor(Math.random() * 50)), queue: Math.floor(Math.random() * 5),
+        availability: { free: freeCount, busy: totalConnectors - freeCount },
+        ecoBase: 60 + Math.floor(Math.random() * 30),
+        historicalWaits: Array.from({ length: 12 }, () => 5 + Math.floor(Math.random() * 10)),
+    };
+}
+
+async function fetchStationsFromTomTom(lat, lon) {
+    $('#list').innerHTML = '<div class="card">Fetching live station data…</div>';
+    toast('Searching for nearby stations…');
+    const radiusMeters = 20000;
+    const limit = 25;
+    const url = `https://api.tomtom.com/search/2/categorySearch/electric vehicle station.json?key=${TOMTOM_API_KEY}&lat=${lat}&lon=${lon}&radius=${radiusMeters}&limit=${limit}`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        const data = await response.json();
+        const transformedStations = data.results.map(transformTomTomStation);
+        if (transformedStations.length === 0) {
+            $('#list').innerHTML = `<div class="card">No stations found within ${radiusMeters/1000}km.</div>`;
+            return;
+        }
+        db.stations = transformedStations;
+        persist();
+        renderList();
+        Map.render();
+        toast(`Found ${transformedStations.length} stations!`, 'ok');
+    } catch (error) {
+        console.error("TomTom Fetch Error:", error);
+        toast('Could not fetch station data.', 'err');
+        $('#list').innerHTML = '<div class="card">Error fetching stations. Please try again.</div>';
+    }
+}
+
+async function fetchStationAvailability(stationId) {
+    const trafficBadge = $('#dTraffic');
+    const sTrafficBadge = $('#sTraffic');
+    trafficBadge.textContent = 'Traffic: Fetching…';
+    sTrafficBadge.textContent = 'Traffic: Fetching…';
+    trafficBadge.style.borderColor = 'var(--muted)';
+    sTrafficBadge.style.borderColor = 'var(--muted)';
+
+    const url = `https://api.tomtom.com/charging/1/availability/${stationId}?key=${TOMTOM_API_KEY}`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Availability API Error');
+        const data = await response.json();
+        const connectors = data.connectors || [];
+        const total = connectors.length;
+        const occupied = connectors.filter(c => c.status === 'Occupied').length;
+
+        let level = 'Low 🟢';
+        let color = '#19ff6d'; // Neon green
+
+        if (total > 0) {
+            const ratio = occupied / total;
+            if (ratio > 0.66) {
+                level = 'High 🔴';
+                color = '#ff5a5a'; // Danger red
+            } else if (ratio > 0.33) {
+                level = 'Medium 🟠';
+                color = '#ffd85a'; // Warn yellow
+            }
+        }
+        
+        trafficBadge.textContent = `Traffic: ${level} (${occupied}/${total} busy)`;
+        sTrafficBadge.textContent = `Traffic: ${level}`;
+        trafficBadge.style.borderColor = color;
+        sTrafficBadge.style.borderColor = color;
+
+    } catch (e) {
+        trafficBadge.textContent = 'Traffic: Unknown';
+        sTrafficBadge.textContent = 'Traffic: Unknown';
+        console.error("Could not fetch station availability:", e);
+    }
+}
+
+function redirectToGoogleMaps() {
+    if (!curr) {
+        toast('Please select a station first.', 'err');
+        return;
+    }
+    const lat = curr.coords[1];
+    const lon = curr.coords[0];
+    const url = `https://maps.google.com/maps?q=${lat},${lon}`;
+    window.open(url, '_blank');
+}
+
+
+/* =============== 01. Data & Persistence =============== */
+const LS={stations:'b.stations',users:'b.users',resv:'b.res',market:'b.market',wallet:'b.wallet',settings:'b.settings',leader:'b.leader'};
+const usersSeed = [
+  {id:'me',name:'You',avatar:'🛞',vehicle:'Hatchback EV',credits:5000,ecoPoints:4200,weekly:220,blocked:[],invisible:false},
+  {id:'arya',name:'Arya',avatar:'🚗',vehicle:'SUV EV',credits:1800,ecoPoints:3800,weekly:310,dest:'ko_vytilla',eta:12,near:[76.30,9.96]},
+  {id:'samir',name:'Samir',avatar:'🚙',vehicle:'Sedan EV',credits:2400,ecoPoints:5100,weekly:440,dest:'tvm_central',eta:15,near:[76.94,8.49]},
+  {id:'lee',name:'Lee',avatar:'🚕',vehicle:'Taxi EV',credits:900,ecoPoints:1600,weekly:150,dest:'ko_vytilla',eta:18,near:[76.31,9.98]}
+];
+const db = {
+  stations: JSON.parse(localStorage.getItem(LS.stations) || '[]'),
+  users: JSON.parse(localStorage.getItem(LS.users) || 'null') || usersSeed,
+  res: JSON.parse(localStorage.getItem(LS.resv) || '[]'),
+  market: JSON.parse(localStorage.getItem(LS.market) || '[]'),
+  wallet: JSON.parse(localStorage.getItem(LS.wallet) || 'null') || {owner:'me',balance:usersSeed[0].credits,history:[]},
+  settings: JSON.parse(localStorage.getItem(LS.settings) || 'null') || {reduce:false,invis:false,block:false},
+  leader: JSON.parse(localStorage.getItem(LS.leader) || 'null') || {
+    weekly: usersSeed.map(u=>({id:u.id,name:u.name,score:u.weekly})),
+    all: usersSeed.map(u=>({id:u.id,name:u.name,score:u.ecoPoints}))
+  }
+};
+function persist(){ Object.keys(LS).forEach(key => localStorage.setItem(LS[key], JSON.stringify(db[key.replace('b.','')]))); }
+setInterval(()=>{
+  if (db.stations.length === 0) return;
+  db.stations.forEach(s=>{
+    s.queue = Math.max(0, s.queue + Math.round((Math.random()-.5)*2));
+    s.availability.free = Math.max(0, s.availability.free + Math.round((Math.random()-.5)*2));
+    const total = s.connectors.reduce((a,c)=>a+c.count,0);
+    s.availability.busy = Math.max(0, total - s.availability.free);
+  });
+  persist(); renderList(); if(curr) showDetails(curr);
+}, 9000);
+
+/* =============== 02. Utils =============== */
+const $=(q,root=document)=>root.querySelector(q); const $$=(q,root=document)=>Array.from(root.querySelectorAll(q));
+function toast(m,kind){const t=document.createElement('div');t.className='toast'; t.textContent=m; if(kind==='ok') t.style.borderColor='#19ff6d88'; if(kind==='err') t.style.borderColor='#ff5a5a88'; $('#toasts').appendChild(t); setTimeout(()=>t.remove(),2800);}
+function km(a,b){const R=6371; const [x1,y1]=a,[x2,y2]=b; const dLat=(y2-y1)*Math.PI/180, dLon=(x2-x1)*Math.PI/180; const s1=Math.sin(dLat/2),s2=Math.sin(dLon/2); const A=s1*s1 + Math.cos(y1*Math.PI/180)*Math.cos(y2*Math.PI/180)*s2*s2; return 2*R*Math.asin(Math.sqrt(A));}
+function etaM(d, v=40){return Math.round((d/v)*60)}
+function INR(n){return '₹'+Number(n).toFixed(0)}
+function spark(el, arr, color='#19ff6d'){const r=window.devicePixelRatio||1;const w=el.clientWidth,h=el.clientHeight;el.width=w*r;el.height=h*r;const c=el.getContext('2d');c.scale(r,r);c.clearRect(0,0,w,h);const min=Math.min(...arr),max=Math.max(...arr);const dx=w/(arr.length-1||1);c.strokeStyle=color;c.lineWidth=2;c.beginPath();arr.forEach((v,i)=>{const x=i*dx;const y=h-((v-min)/(max-min||1))*h;i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();c.fillStyle=color;c.beginPath();c.arc(w, h-((arr.at(-1)-min)/(max-min||1))*h, 3,0,Math.PI*2);c.fill();}
+function donut(el, green){const r=window.devicePixelRatio||1;const w=el.clientWidth,h=el.clientHeight;el.width=w*r;el.height=h*r;const c=el.getContext('2d');c.scale(r,r);c.clearRect(0,0,w,h);const cx=w/2,cy=h/2,rad=Math.min(w,h)/2-8; c.lineWidth=16; c.strokeStyle='#19ff6d22'; c.beginPath(); c.arc(cx,cy,rad,0,Math.PI*2); c.stroke(); c.strokeStyle='#19ff6d'; c.beginPath(); c.arc(cx,cy,rad,-Math.PI/2,-Math.PI/2+(green/100)*Math.PI*2); c.stroke(); c.fillStyle='#eaffea'; c.font='700 16px Inter'; c.textAlign='center'; c.fillText(green+'% green',cx,cy+6);}
+function confetti(){const n=70,box=document.createElement('div');box.style.position='fixed';box.style.inset='0';box.style.pointerEvents='none';box.style.zIndex=10;document.body.appendChild(box);const pieces=[];for(let i=0;i<n;i++){const p=document.createElement('div');p.style.position='absolute';p.style.left=Math.random()*100+'%';p.style.top='-12px';p.style.width='6px';p.style.height='10px';p.style.background=['#19ff6d','#aaffcc','#00ffc3'][i%3];box.appendChild(p);pieces.push({el:p,vy:2+Math.random()*3,vx:(Math.random()-.5)*1.2})}let t=0;(function step(){t++;pieces.forEach(p=>{p.el.style.top=((parseFloat(p.el.style.top)||-12)+p.vy)+'px';p.el.style.left=((parseFloat(p.el.style.left)||0)+p.vx)+'%';}); if(t<220) requestAnimationFrame(step); else box.remove();})();}
+(function particles(){const c=$('#fx'),ctx=c.getContext('2d');let W,H,pts=[];function size(){W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio;pts=Array.from({length:80},()=>({x:Math.random()*W,y:Math.random()*H,r:1+Math.random()*2,vx:(Math.random()-.5)*.22,vy:(Math.random()-.5)*.22}))}addEventListener('resize',size,{passive:true});size();(function tick(){ctx.clearRect(0,0,W,H);ctx.fillStyle='rgba(25,255,109,.55)';pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>W)p.vx*=-1;if(p.y<0||p.y>H)p.vy*=-1;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();});requestAnimationFrame(tick)})()})();
+
+/* =============== 03. Predictions =============== */
+function predict(st){const hist=st.historicalWaits||[8,9,10,9,8,9,11,12,10,9,8,7];const w=hist.map((_,i)=>i+1);const mean=hist.reduce((a,v,i)=>a+v*w[i],0)/w.reduce((a,v)=>a+v,0);const h=new Date().getHours();let f=1; if(h>=18&&h<=21)f=1.3; else if(h>=8&&h<=10)f=1.15; else if(h>=22||h<=6)f=.75; const p1=Math.max(0,Math.round(mean*f + (Math.random()-.5)*2)); const p6=Math.max(0,Math.round(mean*f*1.1 + (Math.random()-.5)*5)); return {p1,p6};}
+
+/* =============== 04. Map (Leaflet + OpenStreetMap) =============== */
+const Map = {
+  lf: null, markers: [], route: null, user: null,
+  async init() {
+    $('#hud').textContent = 'Map: loading…';
+    await this.leaflet();
+    $('#hud').textContent = 'Map: OpenStreetMap';
+    this.render();
+  },
+  css(h) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = h; document.head.appendChild(l); },
+  js(s) { return new Promise((res, rej) => { const el = document.createElement('script'); el.src = s; el.onload = res; el.onerror = rej; document.head.appendChild(el); }); },
+  async leaflet() {
+    this.css('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+    await this.js('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
+    const map = L.map('mapCanvas').setView([20.5937, 78.9629], 5); // Default view of India
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
+    this.lf = map;
+  },
+  clear() {
+    this.markers.forEach(m => m.remove());
+    this.markers = [];
+    if (this.route) { this.lf.removeLayer(this.route); this.route = null; }
+  },
+  markerDom(label, wait) {
+    return `<div style="position:relative; width:22px; height:22px; font-size:12px; text-align:center;"><div style="position:absolute; inset:0; border:2px solid var(--neon); border-radius:50%; background:#022; box-shadow:0 0 16px var(--neon);"></div><div style="position:absolute; inset:-9px; border:2px solid var(--neon-soft); border-radius:50%; animation:pulse 1.6s infinite;"></div><div style="position:absolute; left:28px; top:-4px; white-space:nowrap; background:#041006dd; border:1px solid #19ff6d55; border-radius:8px; padding:2px 6px;">${label} • ${wait}m</div><style>@keyframes pulse{0%{transform:scale(.7);opacity:.6}70%{transform:scale(1.2);opacity:0}100%{opacity:0}}</style></div>`;
+  },
+  render() {
+    this.clear();
+    db.stations.forEach(s => {
+      const {p1}=predict(s);
+      const icon = L.divIcon({ html: this.markerDom('⚡', p1), className: '', iconSize: [22, 22], iconAnchor: [11, 11] });
+      const mk = L.marker([s.coords[1], s.coords[0]], { icon }).addTo(this.lf);
+      mk.on('click', () => pick(s.id, true));
+      this.markers.push(mk);
+    });
+  },
+  center(ll, z=12) { this.lf.setView([ll[1], ll[0]], z); },
+  setUser(ll) {
+    if (!this.user) {
+      this.user = L.marker([ll[1], ll[0]], { title: 'You', draggable: true, zIndexOffset: 1000 }).addTo(this.lf);
+      this.user.on('dragend', () => { const p = this.user.getLatLng(); user = [p.lng, p.lat]; if (curr) this.draw(user, curr.coords); });
+    } else { this.user.setLatLng([ll[1], ll[0]]); }
+  },
+  async draw(from, to) {
+    toast('Calculating route…');
+    if (this.route) { this.lf.removeLayer(this.route); }
+    const fromStr = `${from[1]},${from[0]}`;
+    const toStr = `${to[1]},${to[0]}`;
+    const url = `https://api.tomtom.com/routing/1/calculateRoute/${fromStr}:${toStr}/json?key=${TOMTOM_API_KEY}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        const points = data.routes[0].legs[0].points.map(p => [p.latitude, p.longitude]);
+        this.route = L.polyline(points, { color: '#00A9FF', weight: 5, opacity: 0.8 }).addTo(this.lf);
+        this.lf.fitBounds(this.route.getBounds().pad(0.1));
+    } catch (e) {
+        toast('Could not calculate route.', 'err');
+        console.error('Routing Error:', e);
+    }
+  }
+};
+
+/* =============== 05. Geolocation + routing + Boost =============== */
+let user=[77.2090, 28.6139]; let curr=null;
+function geoloc(){
+  if(!navigator.geolocation){toast('Geolocation unavailable. Drag the user pin.', 'err'); Map.setUser(user); return;}
+  navigator.geolocation.getCurrentPosition(p=>{
+    user=[p.coords.longitude,p.coords.latitude];
+    Map.setUser(user); Map.center(user,13);
+    toast('Location acquired ✔️','ok');
+    fetchStationsFromTomTom(p.coords.latitude, p.coords.longitude);
+  }, ()=>{toast('Permission denied — using manual pin.','err'); Map.setUser(user);}, {enableHighAccuracy:true,timeout:4000,maximumAge:5000});
+}
+function navigate(){
+    if (!curr) return toast('Please select a station first.', 'err');
+    Map.draw(user, curr.coords);
+}
+function boost(){ const pct=+$('#bat').value; $('#batv').textContent=pct+'%'; if(pct<10){const opts=db.stations.filter(s=>s.connectors.some(c=>/DC/i.test(c.type)) && s.availability.free>0); const pick=opts.sort((a,b)=>km(user,a.coords)-km(user,b.coords))[0]; if(pick && (!curr||curr.id!==pick.id)){ curr=pick; if (pick.coords) Map.center(pick.coords,13); select(pick); navigate(); toast('⚠️ Emergency Boost: rerouting to fast charger with availability.'); }}}
+
+/* =============== 06. List, filters, details, bottom sheet =============== */
+function renderList(sort='distance'){
+  const wrap=$('#list');
+  if (db.stations.length === 0) {
+    wrap.innerHTML = '<div class="card">Click \'Locate\' to find stations.</div>';
+    return;
+  }
+  wrap.innerHTML='';
+  const withMeta=db.stations.map(s=>{const d=km(user,s.coords);const {p1,p6}=predict(s);return {...s,dist:d,p1,p6,eco:Math.round((s.renewable/100)*s.ecoBase)}});
+  const sorters={distance:(a,b)=>a.dist-b.dist,price:(a,b)=>a.price-b.price,speed:(a,b)=>Math.max(...(b.connectors.map(c=>c.kw)))-Math.max(...(a.connectors.map(c=>c.kw))),availability:(a,b)=>b.availability.free-a.availability.free,eco:(a,b)=>b.eco-a.eco};
+  withMeta.sort(sorters[sort]||sorters.distance);
+  withMeta.forEach(s=>{
+    const el=document.createElement('div'); el.className='card station';
+    el.innerHTML=`<div>
+      <div style="font-weight:700">${s.name} <span class="pill">₹${s.price}/kWh</span> <span class="pill">${s.city}</span></div>
+      <small style="color:var(--muted)">${s.connectors.map(c=>`${c.type} ${c.kw}kW×${c.count}`).join(' • ')}</small><br/>
+      <small>Queue ${s.queue} • Free ${s.availability.free} • ${s.dist.toFixed(1)} km</small>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+      <canvas class="spark"></canvas>
+      <button class="btn" data-id="${s.id}">View</button>
+    </div>`;
+    spark($('.spark',el),[s.p1-2,s.p1-1,s.p1,s.p1+1,s.p1-1]);
+    $('button',el).onclick=()=>pick(s.id,true);
+    wrap.appendChild(el);
+  });
+}
+function select(st){
+  $('#dName').textContent=st.name; $('#dCity').textContent=st.city; $('#dRating').textContent='★ '+st.rating;
+  const {p1,p6}=predict(st); spark($('#sp1'),[p1-2,p1-1,p1,p1+1,p1-1]); spark($('#sp6'),[p6-3,p6-1,p6,p6+2,p6-2]);
+  donut($('#donut'), st.renewable); const eco=Math.round((st.renewable/100)*st.ecoBase); $('#eco').textContent=eco;
+  $('#comp').innerHTML = st.connectors.map(c=>{const est=25, cost=est*st.price, mins=Math.round((est/(c.kw||10))*60*1.15); return `<div class="card"><span class="pill">${c.type}</span> <span class="pill">${c.kw} kW</span> • Finish ~ ${mins} min • Est. ${INR(cost)}</div>`}).join('');
+  $('#sName').textContent=st.name; $('#sCity').textContent=st.city; $('#sRating').textContent='★ '+st.rating;
+  spark($('#sSp1'),[p1-2,p1-1,p1,p1+1,p1-1]); spark($('#sSp6'),[p6-3,p6-1,p6,p6+2,p6-2]);
+  $('#sComp').innerHTML = st.connectors.map(c=>`<span class="pill">${c.type} ${c.kw}kW</span>`).join(' ');
+  speak(`${st.name}. Predicted wait ${p1} minutes.`);
+}
+function pick(id,center){
+  const st=db.stations.find(s=>s.id===id); if(!st) return;
+  curr=st; select(st); center&&Map.center(st.coords,13);
+  const d=km(user,st.coords), e=etaM(d); $('#eta').textContent=`ETA ${e} min • ${d.toFixed(1)} km`;
+  fetchStationAvailability(st.id);
+  $('#rConn').innerHTML=st.connectors.map(c=>`<option value="${c.type}-${c.kw}">${c.type} ${c.kw}kW</option>`).join('');
+  $('#resFor').textContent=st.name;
+}
+
+/* =============== All other sections (Reservations, Wallet, Buddy, Voice, etc.) remain unchanged =============== */
+function mine(sid){return db.res.find(r=>r.user==='me'&&r.station===sid)}
+function showReserve(){ if(!curr) return toast('Pick a station'); const m=mine(curr.id); $('#rNote').textContent = m?`Reserved ${m.start} • ${m.duration}m (${m.connector})`:'No active reservation'; $('#reserveModal').style.display='grid'; }
+function doReserve(){ if(!curr) return; const start=$('#rStart').value||'17:30', dur=+($('#rDur').value||45), conn=$('#rConn').value; if(mine(curr.id)) return toast('Cancel existing reservation first.','err'); $('#rNote').textContent='Submitting…'; setTimeout(()=>{db.res.push({id:'r'+Date.now(),user:'me',station:curr.id,start,duration:dur,connector:conn,escrow:false}); persist(); $('#rNote').textContent='Reserved ✔️'; renderMarket(); toast('Reservation confirmed','ok'); const h=+start.split(':')[0]; if(h>=22||h<=6) award(50);},800);}
+function cancelMine(){ if(!curr) return; const m=mine(curr.id); if(!m) return toast('No reservation','err'); if(m.escrow){ db.wallet.balance += (m.price||0); db.wallet.history.unshift({t:Date.now(),note:'Escrow refund',delta:+(m.price||0)}); } db.res=db.res.filter(r=>r.id!==m.id); persist(); $('#rNote').textContent='Cancelled'; renderMarket(); toast('Cancelled','ok'); }
+function market(){ const wrap=$('#market'); wrap.innerHTML=''; const items=db.market.map(x=>({ ...x, st: (db.stations.find(s=>s.id===x.station)||{}).name||'Unknown'})); if(!items.length){wrap.innerHTML='<small style="color:var(--muted)">No listings yet</small>';return;} items.forEach(it=>{const row=document.createElement('div'); row.className='card'; row.innerHTML=`<b>${it.st}</b> • ${it.start} • ${it.duration}m • ${it.connector} <span class="badge">${INR(it.price)}</span> <button class="btn" data-id="${it.id}" style="float:right">Buy</button>`; $('button',row).onclick=()=>buy(it.id); wrap.appendChild(row);});}
+function sell(){ if(!curr) return toast('Pick a station'); const m=mine(curr.id); if(!m) return toast('Reserve first','err'); $('#sellModal').style.display='grid'; }
+function sellGo(){ const m=mine(curr.id); if(!m) return; const now=new Date(); const [hh,mm]=m.start.split(':').map(Number); const start=new Date(); start.setHours(hh,mm,0,0); if((start-now)<15*60*1000) return toast('Cannot sell within 15 minutes of start','err'); const price=+($('#sellPrice').value||150), notes=$('#sellNotes').value||''; m.escrow=true; m.price=price; db.wallet.balance-=price; db.wallet.history.unshift({t:Date.now(),note:'Escrow for listing',delta:-price}); db.market.push({id:'L'+Date.now(),owner:'me',station:curr.id,start:m.start,duration:m.duration,connector:m.connector,price,notes}); persist(); $('#sellModal').style.display='none'; market(); toast('Listed ✔️','ok');}
+function buy(id){ const it=db.market.find(x=>x.id===id); if(!it) return; if(db.settings.block) return toast('Buying blocked by privacy setting','err'); if(db.wallet.balance<it.price) return toast('Insufficient balance','err'); db.wallet.balance-=it.price; db.wallet.history.unshift({t:Date.now(),note:'Bought slot',delta:-it.price}); db.res=db.res.filter(r=>!(r.user==='me'&&r.station===it.station&&r.start===it.start)); db.res.push({id:'r'+Date.now(),user:'me',station:it.station,start:it.start,duration:it.duration,connector:it.connector,escrow:false}); db.market=db.market.filter(x=>x.id!==id); persist(); market(); toast('Purchase successful ✔️','ok'); }
+function openWallet(){ $('#bal').textContent=INR(db.wallet.balance); $('#hist').innerHTML = db.wallet.history.map(h=>`<div>${new Date(h.t).toLocaleString()} • ${h.note} <span class="badge" style="float:right">${h.delta>0?'+':''}${INR(h.delta)}</span></div>`).join('')||'<small style="color:var(--muted)">No history</small>'; $('#walletModal').style.display='grid';}
+$('#add').onclick=()=>{const a=+($('#amt').value||0); if(a>0){db.wallet.balance+=a; db.wallet.history.unshift({t:Date.now(),note:'Top up',delta:+a}); persist(); openWallet(); toast('Topped up','ok');}};
+$('#ded').onclick=()=>{const a=+($('#amt').value||0); if(a>0&&db.wallet.balance>=a){db.wallet.balance-=a; db.wallet.history.unshift({t:Date.now(),note:'Manual spend',delta:-a}); persist(); openWallet();}};
+let chatBuddy=null;
+function buddies(){ const wrap=$('#buddies'); wrap.innerHTML=''; const list=db.users.filter(u=>u.id!=='me' && u.dest && !db.settings.block); if(!list.length){wrap.innerHTML='<small style="color:var(--muted)">No buddies nearby</small>';return;} list.forEach(b=>{const near=b.near||[user[0]+(Math.random()-.5)*.1,user[1]+(Math.random()-.5)*.1]; const eta=b.eta || Math.max(6, Math.round(km(near,curr?curr.coords:user)/0.6)); const row=document.createElement('div'); row.className='card'; row.innerHTML=`<span class="badge">${b.avatar}</span> <b>${b.name}</b> • ${b.vehicle} • ETA ${eta}m <button class="btn" data-id="${b.id}" style="float:right">Join</button> <button class="btn ghost" data-p="${b.id}" style="float:right;margin-right:6px">Ping</button>`; $('[data-id]',row).onclick=()=>{chatBuddy=b; openChat();}; $('[data-p]',row).onclick=()=>toast('Ping sent to '+b.name,'ok'); wrap.appendChild(row); });}
+function openChat(){ $('#msgs').innerHTML = `<div class="msg">Hi, heading to ${curr?curr.name:'the station'} — convoy?</div><div class="msg me">Yes, see you in ~10 minutes.</div>`; $('#chat').style.display='block'; }
+$('#send').onclick=()=>{const t=$('#say').value.trim(); if(!t) return; $('#msgs').insertAdjacentHTML('beforeend', `<div class="msg me">${t}</div>`); $('#say').value=''; };
+function award(n){ const me=db.users.find(u=>u.id==='me'); const prev=me.ecoPoints; me.ecoPoints+=n; db.leader.all = upd(db.leader.all, me.id, me.ecoPoints); db.leader.weekly = upd(db.leader.weekly, me.id, (db.leader.weekly.find(x=>x.id===me.id)?.score||0)+n); persist(); if(Math.floor(prev/1000)!==Math.floor(me.ecoPoints/1000)) confetti(); }
+function upd(list,id,score){const others=list.filter(x=>x.id!==id); return [...others,{id,name:'You',score}].sort((a,b)=>b.score-a.score).slice(0,10)}
+function showLB(tab='weekly'){ renderLB(tab); $('#leader').style.display='grid'; }
+function renderLB(tab){ $$('.chip[data-tab]').forEach(c=>c.classList.toggle('badge', c.dataset.tab===tab)); const list=db.leader[tab]; $('#lb').innerHTML=list.map((l,i)=>`<div class="card"><span class="badge">#${i+1}</span> ${l.name} <span class="badge" style="float:right">${l.score} pts</span></div>`).join(''); }
+function speak(t) { try { const u = new SpeechSynthesisUtterance(t); u.lang = 'en-IN'; window.speechSynthesis.speak(u); } catch (e) {} }
+
+// ========== MODIFICATION START: Updated Voice and Command Functions ==========
+function voice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    toast('Speech recognition unsupported', 'err');
+    return;
+  }
+  const r = new SR();
+  r.lang = 'en-IN';
+  r.interimResults = false;
+  r.maxAlternatives = 1;
+  r.continuous = false;
+
+  const overlay = $('#voice-overlay');
+  const transcriptEl = $('#voice-transcript');
+  
+  overlay.style.display = 'grid';
+  transcriptEl.textContent = 'Listening...';
+
+  speak('How can I help you?');
+
+  r.onresult = e => {
+    const t = e.results[0][0].transcript.toLowerCase();
+    transcriptEl.textContent = `"${t}"`;
+    setTimeout(() => {
+        cmd(t);
+        overlay.style.display = 'none';
+    }, 1200);
+  };
+
+  r.onerror = (e) => {
+    toast('Voice error or permission denied.', 'err');
+    console.error('Speech Recognition Error:', e);
+    overlay.style.display = 'none';
+  };
+
+  r.onend = () => {
+    console.log('Voice listening stopped.');
+  };
+  
+  r.start();
+}
+
+function cmd(t) {
+  // Enhanced command for universal location navigation
+  const navRegex = /(?:navigate to|show me|go to)\s*(.+)/i;
+  const navMatch = t.match(navRegex);
+  if (navMatch && navMatch[1]) {
+    const locationName = navMatch[1].trim();
+    speak(`Navigating to ${locationName}.`);
+    geocodeAndNavigate(locationName);
+    return; // Command handled
+  }
+  
+  if (/fastest charger near me/.test(t)) { const n = nearest(true); pick(n.id, true); navigate(); return; }
+  if (/book slot at (.+)/.test(t)) { const m = t.match(/book slot at (.+)/); const name = (m[1] || '').trim(); const st = db.stations.find(s => s.name.toLowerCase().includes(name.toLowerCase())); if (st) { pick(st.id, true); showReserve(); return; } }
+  
+  toast(`Command not recognized. Try: "Go to Agra"`);
+}
+// ========== MODIFICATION END ==========
+
+function ac(q){const items=[]; db.stations.forEach(s=>{if(s.name.toLowerCase().includes(q)||s.city.toLowerCase().includes(q)) items.push({label:s.name+' • '+s.city, id:s.id, type:'station'}); s.connectors.forEach(c=>{if(c.type.toLowerCase().includes(q)) items.push({label:`${c.type} at ${s.name}`, id:s.id, type:'station'})});}); ['Kochi','Thiruvananthapuram','Mumbai','Delhi','Bengaluru','Ernakulam','Vytilla'].forEach(c=>{if(c.toLowerCase().includes(q)) items.push({label:'City: '+c, type:'city', city:c})}); return items.slice(0,12);}
+
+const cityCoordinates = {
+    'kochi': { lat: 9.9312, lon: 76.2673 },
+    'thiruvananthapuram': { lat: 8.5241, lon: 76.9366 },
+    'mumbai': { lat: 19.0760, lon: 72.8777 },
+    'delhi': { lat: 28.6139, lon: 77.2090 },
+    'bengaluru': { lat: 12.9716, lon: 77.5946 }
+};
+
+function jump(city) {
+    const cityKey = city.toLowerCase();
+    const coords = cityCoordinates[cityKey];
+    if (coords) {
+        const { lat, lon } = coords;
+        Map.center([lon, lat], 12); 
+        fetchStationsFromTomTom(lat, lon); 
+        toast(`Searching for stations in ${city}`);
+    } else {
+        // Fallback to geocoding for cities not in the list
+        geocodeAndNavigate(city);
+    }
+}
+
+// ========== MODIFICATION START: Updated Search Bar Logic ==========
+function handleSearch() {
+    const query = $('#q').value.trim();
+    if (query) {
+        geocodeAndNavigate(query);
+        $('#q').value = '';
+        $('#alist').classList.remove('show');
+    }
+}
+
+$('#qbtn').onclick = handleSearch;
+$('#q').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        handleSearch();
+    }
+});
+// ========== MODIFICATION END ==========
+
+$$('.chip[data-city]').forEach(c=>c.onclick=()=>jump(c.dataset.city));
+if('serviceWorker' in navigator){const code=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(clients.claim()));self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))})`;const url=URL.createObjectURL(new Blob([code],{type:'text/javascript'}));navigator.serviceWorker.register(url).catch(err => console.error('Service Worker registration failed:', err));}
+
+/* =============== 13. Wiring & init =============== */
+function openSettings(){ $('#reduce').checked=db.settings.reduce; $('#invis').checked=db.settings.invis; $('#block').checked=db.settings.block; $('#settingsModal').style.display='grid';}
+$('#saveSettings').onclick=()=>{db.settings.reduce=$('#reduce').checked; db.settings.invis=$('#invis').checked; db.settings.block=$('#block').checked; persist(); toast('Settings saved','ok');};
+$('#loc').onclick=geoloc; $('#fabLocate').onclick=geoloc;
+$('#nav').onclick=navigate; $('#sNav').onclick=navigate;
+$('#gmap-nav').onclick = redirectToGoogleMaps;
+$('#s-gmap-nav').onclick = redirectToGoogleMaps;
+$('#reserve').onclick=showReserve; $('#sReserve').onclick=showReserve;
+$('#rGo').onclick=doReserve; $('#rCancel').onclick=cancelMine;
+$('#sell').onclick=sell; $('#sellGo').onclick=sellGo;
+$('#wallet').onclick=openWallet; $('#fabWallet').onclick=openWallet;
+$('#lead').onclick=()=>showLB('weekly');
+$('#settings').onclick=openSettings;
+$('#buddy').onclick=()=>{ $('#chat').style.display='block'; buddies(); };
+$('#fabBuddy').onclick=()=>{ $('#chat').style.display='block'; buddies(); };
+$('#mic').onclick=voice; $('#fabVoice').onclick=voice;
+$('#bat').addEventListener('input',boost);
+$$('.close').forEach(x=>x.onclick=()=>$(x.dataset.close).style.display='none');
+['walletModal','leader','reserveModal','sellModal','settingsModal'].forEach(id=> $('#'+id).addEventListener('click',e=>{if(e.target.id===id) e.currentTarget.style.display='none'}));
+$$('.chip[data-sort]').forEach(c=> c.onclick=()=>{ $$('.chip[data-sort]').forEach(x=>x.classList.remove('badge')); c.classList.add('badge'); renderList(c.dataset.sort); });
+$('#rs').onclick=()=>{ $$('.chip[data-sort]').forEach(x=>x.classList.remove('badge')); renderList(); };
+(async function boot(){
+  await Map.init();
+  renderList();
+  buddies();
+  market();
+  $('#batv').textContent=$('#bat').value+'%';
+  const mobile = matchMedia('(max-width:980px)').matches;
+  if(mobile){ $('#fabBar').style.display='flex'; }
+})();
+</script>
+</body>
+</html>
